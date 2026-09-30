@@ -24,7 +24,14 @@
 
 ```text
 vi_curve_modeling/
-├── BiLSTM.py               # 模型架構、資料載入、訓練與評估主程式
+├── BiLSTM.py               # 執行入口主程式 (協調資料載入、訓練與評估主流程)
+├── src/                    # 核心功能模組套件
+│   ├── __init__.py         # 模組統一匯出入口
+│   ├── data.py             # 資料載入、抗混疊降採樣、Dataset 與動態批次填充 (collate_fn)
+│   ├── model.py            # BiLSTMSurrogate 雙向神經網路架構
+│   ├── trainer.py          # 遮罩均方誤差 (Masked MSE)、訓練迴圈與推論引擎
+│   ├── metrics.py          # 工程評估指標計算 (RMSE, MAE, R², Fit Acc, 2% Tol)
+│   └── visualization.py    # 動態暫態特徵鎖定演算法與三合一高精度繪圖
 ├── requirements.txt        # 專案依賴套件清單
 ├── .gitignore              # Git 忽略設定檔（排除大型資料集、虛擬環境與快取）
 ├── .gitattributes          # Git 屬性設定
@@ -120,7 +127,9 @@ python BiLSTM.py --help
 | `--num_layers` | `1` | BiLSTM 堆疊層數 |
 | `--lr` | `0.001` | Adam 優化器學習率 |
 | `--output_dir` | `results` | 成果圖表與評估結果儲存路徑 |
+| `--zoom_window`| `150` | 高精度放大對比圖所展示的動態瞬態採樣點數 |
 | `--seed` | `42` | 隨機種子 (Reproducibility) |
+| `--eval_only` | `False` | 略過訓練，直接載入已訓練權重進行評估與繪圖 |
 
 ---
 
@@ -128,10 +137,17 @@ python BiLSTM.py --help
 
 訓練與測試完成後，成果將自動儲存於 `--output_dir`（預設為 `results/`）：
 
-1. **`vi_bilstm_model.pt`**：訓練完畢之 PyTorch 模型權重權限存檔。
-2. **`vi_bilstm_test_results.csv`**：測試集中各事件的序列長度、Baseline MSE 與 BiLSTM MSE 評估明細。
-3. **`vi_bilstm_example_typical.png`**：中位數代表性事件的預測波形 vs 真實波形對比圖。
-4. **`vi_bilstm_example_worst_case.png`**：最差案例（Worst Case）分析圖，便於極值分析與改進。
+1. **`vi_bilstm_model.pt`**：訓練完畢之 PyTorch 模型權重存檔。
+2. **`vi_bilstm_test_results.csv`**：測試集中各事件的詳細評估指標，包含：
+   - 擬合準確率（Fit Accuracy %）與 2% 容差精度（Tolerance Accuracy %）
+   - $R^2$ 判定係數（Goodness of Fit）
+   - RMSE（均方根誤差）、MAE（平均絕對誤差）與 MSE（均方誤差）
+3. **`vi_bilstm_example_typical_high_precision.png`** & **`vi_bilstm_example_worst_case_high_precision.png`**：
+   - **高精度多面板放大對比圖（300 DPI）**：
+     - **Panel 1 (全域波形)**：完整 Episode 波形比對、標註瞬態高動態選取區，並附上 Accuracy / $R^2$ / RMSE 性能資訊卡。
+     - **Panel 2 (局部高精度放大)**：鎖定訊號變化最劇烈的瞬態/躍階區段，以高解析度點標記（Markers）展示點對點緊密貼合度。
+     - **Panel 3 (瞬時絕對誤差殘差)**：直觀對比 BiLSTM 誤差殘差 vs 靜態線性模型誤差。
+4. **`vi_bilstm_example_typical.png`** & **`vi_bilstm_example_worst_case.png`**：標準全域曲線對照圖。
 
 ---
 

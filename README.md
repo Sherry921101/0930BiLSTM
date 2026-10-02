@@ -128,6 +128,7 @@ python BiLSTM.py --help
 | `--lr` | `0.001` | Adam 優化器學習率 |
 | `--output_dir` | `results` | 成果圖表與評估結果儲存路徑 |
 | `--zoom_window`| `150` | 高精度放大對比圖所展示的動態瞬態採樣點數 |
+| `--baseline_type` | `xgboost` | 基準對照組架構：`xgboost` (XGBoost 梯度提升樹)、`rf` (隨機森林) 或 `linear` (線性回歸) |
 | `--seed` | `42` | 隨機種子 (Reproducibility) |
 | `--eval_only` | `False` | 略過訓練，直接載入已訓練權重進行評估與繪圖 |
 
@@ -139,9 +140,11 @@ python BiLSTM.py --help
 
 1. **`vi_bilstm_model.pt`**：訓練完畢之 PyTorch 模型權重存檔。
 2. **`vi_bilstm_test_results.csv`**：測試集中各事件的詳細評估指標，包含：
-   - 擬合準確率（Fit Accuracy %）與 2% 容差精度（Tolerance Accuracy %）
-   - $R^2$ 判定係數（Goodness of Fit）
-   - RMSE（均方根誤差）、MAE（平均絕對誤差）與 MSE（均方誤差）
+   - **Fit Accuracy（擬合準確率 %）**：基於 NRMSE，評估全動態幅值範圍內的波形吻合率
+   - **$R^2$ 判定係數（Goodness of Fit）**：衡量模型對真實電壓波動趨勢的解釋能力
+   - **RMSE（均方根誤差）**：平方放大加總後開根號，著重處罰暫態跳變時的極值大誤差
+   - **MAE（平均絕對誤差）**：各時刻絕對偏差的算術平均，代表直觀物理誤差
+   - **MSE（均方誤差）**：模型反向傳播訓練損失之基準
 3. **`vi_bilstm_example_typical_high_precision.png`** & **`vi_bilstm_example_worst_case_high_precision.png`**：
    - **高精度多面板放大對比圖（300 DPI）**：
      - **Panel 1 (全域波形)**：完整 Episode 波形比對、標註瞬態高動態選取區，並附上 Accuracy / $R^2$ / RMSE 性能資訊卡。

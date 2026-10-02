@@ -17,7 +17,7 @@ def resolve_data_dir(user_specified_dir):
         return user_specified_dir
     candidates = ["./B6031600_event_all", "./data", "."]
     for c in candidates:
-        if os.path.isdir(c) and len(glob.glob(os.path.join(c, "B6031600_*.csv"))) > 0:
+        if os.path.isdir(c) and len(glob.glob(os.path.join(c, "B6031600*.csv"))) > 0:
             return c
     return "./data"
 

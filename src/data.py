@@ -17,7 +17,7 @@ def resolve_data_dir(user_specified_dir):
         return user_specified_dir
     candidates = ["./B6031600_event_all", "./data", "."]
     for c in candidates:
-        if os.path.isdir(c) and len(glob.glob(os.path.join(c, "B6031600_*.csv"))) > 0:
+        if os.path.isdir(c) and len(glob.glob(os.path.join(c, "B6031600*.csv"))) > 0:
             return c
     return "./data"
 
@@ -28,7 +28,7 @@ def load_episode_files(file_dir, pattern, u_col, i_col, event_col, downsample_fa
     
     參數:
     - file_dir: 存放 CSV 檔案的資料夾路徑。
-    - pattern: 檔名匹配規則（例如 'B6031600_*.csv'）。
+    - pattern: 檔名匹配規則（例如 'B6031600*.csv'）。
     - u_col: 目標電壓欄位名稱（例如 'U1'）。
     - i_col: 輸入電流欄位名稱（例如 'I1'）。
     - event_col: 標記事件編號的欄位名稱（例如 'EventNo'）。

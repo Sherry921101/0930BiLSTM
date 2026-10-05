@@ -1,12 +1,10 @@
 """
 BiLSTM.py: 電壓-電流 (V-I) 特性曲線動態代理模型的主執行入口。
-
-本腳本採用模組化設計：
 - 資料載入與批次預處理: src.data
-- 雙向 LSTM 模型架構:  src.model
+- 模型架構:  src.model
 - 訓練與推論執行引擎:  src.trainer
-- 工程指標評估與統計:  src.metrics
-- 高解析度視覺化繪圖:  src.visualization
+- 指標評估:  src.metrics
+- 視覺化繪圖:  src.visualization
 """
 
 import argparse
@@ -49,8 +47,8 @@ def parse_args():
     parser = argparse.ArgumentParser(description="BiLSTM Surrogate Model for V-I Curve Modeling")
     parser.add_argument("--data_dir", type=str, default=None,
                         help="Path to folder containing CSV files (default: auto-detect B6031600_event_all or data/)")
-    parser.add_argument("--file_pattern", type=str, default="B6031600_*.csv",
-                        help="Glob pattern for event CSV files (default: 'B6031600_*.csv')")
+    parser.add_argument("--file_pattern", type=str, default="B6031600*.csv",
+                        help="Glob pattern for event CSV files (default: 'B6031600*.csv')")
     parser.add_argument("--u_col", type=str, default="U1",
                         help="Target voltage column name (default: 'U1')")
     parser.add_argument("--i_col", type=str, default="I1",

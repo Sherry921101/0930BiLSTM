@@ -2,6 +2,66 @@ import torch.nn as nn
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 
+class RNNSurrogate(nn.Module):
+    def __init__(self, input_size=1, hidden_size=32, num_layers=1, dropout=0.2):
+        super().__init__()
+        self.rnn = nn.RNN(
+            input_size=input_size,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            batch_first=True,
+            bidirectional=False,
+            dropout=dropout if num_layers > 1 else 0.0,
+        )
+        self.fc = nn.Linear(hidden_size, 1)
+
+    def forward(self, i_seq, lengths):
+        packed = pack_padded_sequence(i_seq, lengths.cpu(), batch_first=True, enforce_sorted=False)
+        packed_out, _ = self.rnn(packed)
+        out, _ = pad_packed_sequence(packed_out, batch_first=True, total_length=i_seq.size(1))
+        return self.fc(out)
+
+
+class LSTMSurrogate(nn.Module):
+    def __init__(self, input_size=1, hidden_size=32, num_layers=1, dropout=0.2):
+        super().__init__()
+        self.lstm = nn.LSTM(
+            input_size=input_size,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            batch_first=True,
+            bidirectional=False,
+            dropout=dropout if num_layers > 1 else 0.0,
+        )
+        self.fc = nn.Linear(hidden_size, 1)
+
+    def forward(self, i_seq, lengths):
+        packed = pack_padded_sequence(i_seq, lengths.cpu(), batch_first=True, enforce_sorted=False)
+        packed_out, _ = self.lstm(packed)
+        out, _ = pad_packed_sequence(packed_out, batch_first=True, total_length=i_seq.size(1))
+        return self.fc(out)
+
+
+class GRUSurrogate(nn.Module):
+    def __init__(self, input_size=1, hidden_size=32, num_layers=1, dropout=0.2):
+        super().__init__()
+        self.gru = nn.GRU(
+            input_size=input_size,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            batch_first=True,
+            bidirectional=False,
+            dropout=dropout if num_layers > 1 else 0.0,
+        )
+        self.fc = nn.Linear(hidden_size, 1)
+
+    def forward(self, i_seq, lengths):
+        packed = pack_padded_sequence(i_seq, lengths.cpu(), batch_first=True, enforce_sorted=False)
+        packed_out, _ = self.gru(packed)
+        out, _ = pad_packed_sequence(packed_out, batch_first=True, total_length=i_seq.size(1))
+        return self.fc(out)
+
+
 class BiLSTMSurrogate(nn.Module):
     """
     雙向 LSTM 代理模型（Bidirectional LSTM Surrogate Model）：

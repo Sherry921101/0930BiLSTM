@@ -35,31 +35,47 @@ def compute_episode_metrics(u_true, u_pred, prefix="bilstm"):
     }
 
 
-def summarize_and_print_metrics(model_df, base_df):
+def summarize_and_print_metrics(all_metrics_dfs):
     """
-    統計所有測試事件的平均指標，並在終端打印格式化對比報表（BiLSTM vs. Linear Baseline）。
+    統計所有測試事件的平均指標，並在終端打印多模型對比報表。
+    all_metrics_dfs: dict, mapping model name (e.g., "Baseline", "RNN", ...) to its DataFrame.
     """
-    mean_m_mse, mean_b_mse = float(model_df["bilstm_mse"].mean()), float(base_df["baseline_mse"].mean())
-    mean_m_rmse, mean_b_rmse = float(model_df["bilstm_rmse"].mean()), float(base_df["baseline_rmse"].mean())
-    mean_m_mae, mean_b_mae = float(model_df["bilstm_mae"].mean()), float(base_df["baseline_mae"].mean())
-    mean_m_r2, mean_b_r2 = float(model_df["bilstm_r2"].mean()), float(base_df["baseline_r2"].mean())
-    mean_m_acc, mean_b_acc = float(model_df["bilstm_acc"].mean()), float(base_df["baseline_acc"].mean())
-    mean_m_tol, mean_b_tol = float(model_df["bilstm_tol_acc"].mean()), float(base_df["baseline_tol_acc"].mean())
-
-    mse_imp = (1.0 - mean_m_mse / mean_b_mse) * 100.0 if mean_b_mse > 0 else float("nan")
-    rmse_imp = (1.0 - mean_m_rmse / mean_b_rmse) * 100.0 if mean_b_rmse > 0 else float("nan")
-    mae_imp = (1.0 - mean_m_mae / mean_b_mae) * 100.0 if mean_b_mae > 0 else float("nan")
-
-    print("\n" + "=" * 82)
-    print("        Test-Set Performance & Accuracy Summary (BiLSTM vs. Baseline)")
-    print("=" * 82)
-    print(f"{'Evaluation Metric':<26} | {'BiLSTM Model':<16} | {'Linear Baseline':<16} | {'Comparison':<16}")
-    print("-" * 82)
-    print(f"{'Mean Fit Accuracy (%)':<26} | {mean_m_acc:<16.2f}% | {mean_b_acc:<16.2f}% | {mean_m_acc - mean_b_acc:+.2f}%")
-    print(f"{'2% Tolerance Acc (%)':<26} | {mean_m_tol:<16.2f}% | {mean_b_tol:<16.2f}% | {mean_m_tol - mean_b_tol:+.2f}%")
-    print(f"{'Mean R² Score':<26} | {mean_m_r2:<16.4f} | {mean_b_r2:<16.4f} | {mean_m_r2 - mean_b_r2:+.4f}")
-    print(f"{'Mean RMSE':<26} | {mean_m_rmse:<16.5f} | {mean_b_rmse:<16.5f} | {rmse_imp:+.1f}% error red.")
-    print(f"{'Mean MAE':<26} | {mean_m_mae:<16.5f} | {mean_b_mae:<16.5f} | {mae_imp:+.1f}% error red.")
-    print(f"{'Mean MSE':<26} | {mean_m_mse:<16.5f} | {mean_b_mse:<16.5f} | {mse_imp:+.1f}% error red.")
-    print(f"{'Worst Episode MSE':<26} | {float(model_df['bilstm_mse'].max()):<16.5f} | {float(base_df['baseline_mse'].max()):<16.5f} | -")
-    print("=" * 82)
+    # 預期 prefix 是轉為小寫的模型名稱
+    models = list(all_metrics_dfs.keys())
+    
+    print("\n" + "=" * 90)
+    print("                    Test-Set Performance & Accuracy Summary")
+    print("=" * 90)
+    
+    # Header
+    header = f"{'Evaluation Metric':<20} | " + " | ".join([f"{m:<10}" for m in models])
+    print(header)
+    print("-" * 90)
+    
+    metrics = [
+        ("Mean Fit Acc (%)", "acc", "{:.2f}"),
+        ("2% Tolerance Acc (%)", "tol_acc", "{:.2f}"),
+        ("Mean R² Score", "r2", "{:.4f}"),
+        ("Mean RMSE", "rmse", "{:.5f}"),
+        ("Mean MAE", "mae", "{:.5f}"),
+        ("Mean MSE", "mse", "{:.5f}"),
+        ("Worst MSE", "mse", "{:.5f}"),
+    ]
+    
+    for metric_name, suffix, fmt in metrics:
+        row_str = f"{metric_name:<20} | "
+        vals = []
+        for m in models:
+            df = all_metrics_dfs[m]
+            prefix = m.lower()
+            col_name = f"{prefix}_{suffix}"
+            
+            if metric_name == "Worst MSE":
+                val = float(df[col_name].max())
+            else:
+                val = float(df[col_name].mean())
+            vals.append(fmt.format(val))
+        row_str += " | ".join([f"{v:<10}" for v in vals])
+        print(row_str)
+        
+    print("=" * 90)

@@ -28,7 +28,7 @@ def load_episode_files(file_dir, pattern, u_col, i_col, event_col, downsample_fa
     
     參數:
     - file_dir: 存放 CSV 檔案的資料夾路徑。
-    - pattern: 檔名匹配規則（例如 'B6031600_*.csv'）。
+    - pattern: 檔名匹配規則（例如 'B6031600*.csv'）。
     - u_col: 目標電壓欄位名稱（例如 'U1'）。
     - i_col: 輸入電流欄位名稱（例如 'I1'）。
     - event_col: 標記事件編號的欄位名稱（例如 'EventNo'）。

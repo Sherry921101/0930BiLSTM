@@ -47,8 +47,8 @@ def parse_args():
     parser = argparse.ArgumentParser(description="BiLSTM Surrogate Model for V-I Curve Modeling")
     parser.add_argument("--data_dir", type=str, default=None,
                         help="Path to folder containing CSV files (default: auto-detect B6031600_event_all or data/)")
-    parser.add_argument("--file_pattern", type=str, default="B6031600_*.csv",
-                        help="Glob pattern for event CSV files (default: 'B6031600_*.csv')")
+    parser.add_argument("--file_pattern", type=str, default="B6031600*.csv",
+                        help="Glob pattern for event CSV files (default: 'B6031600*.csv')")
     parser.add_argument("--u_col", type=str, default="U1",
                         help="Target voltage column name (default: 'U1')")
     parser.add_argument("--i_col", type=str, default="I1",

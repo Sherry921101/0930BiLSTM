@@ -17,7 +17,6 @@ from src.data import (
     load_episode_files,
     EpisodeDataset,
     collate_variable_length,
-    resolve_data_dir,
 )
 from src.model import BiLSTMSurrogate, RNNSurrogate, LSTMSurrogate, GRUSurrogate
 from src.trainer import (
@@ -36,11 +35,16 @@ from src.visualization import (
 )
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Surrogate Models for V-I Curve Modeling")
-    parser.add_argument("--data_dir", type=str, default=None)
-    parser.add_argument("--file_pattern", type=str, default="B6031600*.csv")
+    parser = argparse.ArgumentParser(description="Surrogate Models for V-I Curve Modeling (OOD Evaluation)")
+    parser.add_argument("--train_dir", type=str, default="B6031600_event_all", help="Directory for training data")
+    parser.add_argument("--test_dir", type=str, default="26011200_event_all", help="Directory for testing data (OOD)")
+    parser.add_argument("--train_pattern", type=str, default="B6031600*.csv", help="Pattern for training files")
+    parser.add_argument("--test_pattern", type=str, default="26011200*.csv", help="Pattern for testing files")
     parser.add_argument("--u_col", type=str, default="U1")
+    parser.add_argument("--test_u_col", type=str, default="U12", help="Voltage column for test data")
+    parser.add_argument("--invert_test_u", action="store_true", help="Multiply test target voltage by -1")
     parser.add_argument("--i_col", type=str, default="I1")
+    parser.add_argument("--test_i_col", type=str, default="I1", help="Current column for test data")
     parser.add_argument("--event_col", type=str, default="EventNo")
     parser.add_argument("--downsample", type=int, default=1)
     parser.add_argument("--epochs", type=int, default=30)
@@ -49,7 +53,7 @@ def parse_args():
     parser.add_argument("--hidden_size", type=int, default=32)
     parser.add_argument("--num_layers", type=int, default=1)
     parser.add_argument("--dropout", type=float, default=0.2)
-    parser.add_argument("--output_dir", type=str, default="results")
+    parser.add_argument("--output_dir", type=str, default="results_ood")
     parser.add_argument("--zoom_window", type=int, default=150)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--eval_only", action="store_true")
@@ -63,36 +67,49 @@ def main():
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(args.seed)
 
-    data_dir = resolve_data_dir(args.data_dir)
     os.makedirs(args.output_dir, exist_ok=True)
 
-    U_list, I_list, episode_ids, lengths = load_episode_files(
-        data_dir, args.file_pattern, args.u_col, args.i_col, args.event_col, args.downsample
+    print("Loading Training Data...")
+    train_U_list, train_I_list, train_ids, train_lengths = load_episode_files(
+        args.train_dir, args.train_pattern, args.u_col, args.i_col, args.event_col, args.downsample
     )
-    n_episodes = len(U_list)
+    
+    print("Loading Testing Data (OOD)...")
+    test_U_list, test_I_list, test_ids, test_lengths = load_episode_files(
+        args.test_dir, args.test_pattern, args.test_u_col, args.test_i_col, args.event_col, args.downsample
+    )
 
-    idx = np.arange(n_episodes)
-    train_idx, temp_idx = train_test_split(idx, test_size=0.2, random_state=args.seed)
-    val_idx, test_idx = train_test_split(temp_idx, test_size=0.5, random_state=args.seed)
+    if args.invert_test_u:
+        print("Inverting test target voltage (multiplying by -1)...")
+        test_U_list = [-1.0 * u for u in test_U_list]
 
-    train_U_concat = np.concatenate([U_list[i] for i in train_idx]).reshape(-1, 1)
-    train_I_concat = np.concatenate([I_list[i] for i in train_idx]).reshape(-1, 1)
+    n_train_episodes = len(train_U_list)
+    idx = np.arange(n_train_episodes)
+    # Split train data into train and validation sets
+    train_idx, val_idx = train_test_split(idx, test_size=0.1, random_state=args.seed)
 
+    train_U_concat = np.concatenate([train_U_list[i] for i in train_idx]).reshape(-1, 1)
+    train_I_concat = np.concatenate([train_I_list[i] for i in train_idx]).reshape(-1, 1)
+
+    # Fit scalers ONLY on training set
     scaler_U = StandardScaler().fit(train_U_concat)
     scaler_I = StandardScaler().fit(train_I_concat)
 
     def scale_list(arr_list, scaler):
         return [scaler.transform(a.reshape(-1, 1)).flatten() for a in arr_list]
 
-    U_scaled_all = scale_list(U_list, scaler_U)
-    I_scaled_all = scale_list(I_list, scaler_I)
+    train_U_scaled_all = scale_list(train_U_list, scaler_U)
+    train_I_scaled_all = scale_list(train_I_list, scaler_I)
+    
+    test_U_scaled = scale_list(test_U_list, scaler_U)
+    test_I_scaled = scale_list(test_I_list, scaler_I)
 
     def subset(lst, indices):
         return [lst[i] for i in indices]
 
-    train_ds = EpisodeDataset(subset(I_scaled_all, train_idx), subset(U_scaled_all, train_idx))
-    val_ds = EpisodeDataset(subset(I_scaled_all, val_idx), subset(U_scaled_all, val_idx))
-    test_ds = EpisodeDataset(subset(I_scaled_all, test_idx), subset(U_scaled_all, test_idx))
+    train_ds = EpisodeDataset(subset(train_I_scaled_all, train_idx), subset(train_U_scaled_all, train_idx))
+    val_ds = EpisodeDataset(subset(train_I_scaled_all, val_idx), subset(train_U_scaled_all, val_idx))
+    test_ds = EpisodeDataset(test_I_scaled, test_U_scaled)
 
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, collate_fn=collate_variable_length)
     val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False, collate_fn=collate_variable_length)
@@ -112,7 +129,6 @@ def main():
 
     models = {}
     preds_scaled_all = {}
-    all_metrics = {}
 
     for m_name, m_cls in model_classes.items():
         print(f"\n--- Training {m_name} ---")
@@ -133,14 +149,14 @@ def main():
     per_file_metrics["Baseline"] = []
     results_rows = []
 
-    for local_i, global_i in tqdm(enumerate(test_idx), total=len(test_idx), desc="Evaluating"):
-        u_true_scaled = U_scaled_all[global_i].reshape(-1, 1)
-        i_true_scaled = I_scaled_all[global_i].reshape(-1, 1)
+    for local_i in tqdm(range(len(test_U_list)), desc="Evaluating OOD"):
+        u_true_scaled = test_U_scaled[local_i].reshape(-1, 1)
+        i_true_scaled = test_I_scaled[local_i].reshape(-1, 1)
 
         u_true = scaler_U.inverse_transform(u_true_scaled).flatten()
         u_baseline = lin_reg.predict(scaler_I.inverse_transform(i_true_scaled)).flatten()
         
-        row = {"episode_id": episode_ids[global_i], "length": lengths[global_i]}
+        row = {"episode_id": test_ids[local_i], "length": test_lengths[local_i]}
         base_ep_metrics = compute_episode_metrics(u_true, u_baseline, prefix="baseline")
         per_file_metrics["Baseline"].append(base_ep_metrics)
         row.update(base_ep_metrics)
@@ -171,16 +187,15 @@ def main():
     }
 
     for label, local_idx in example_local.items():
-        global_i = test_idx[local_idx]
-        u_true = scaler_U.inverse_transform(U_scaled_all[global_i].reshape(-1, 1)).flatten()
-        i_vals = scaler_I.inverse_transform(I_scaled_all[global_i].reshape(-1, 1)).flatten()
+        u_true = scaler_U.inverse_transform(test_U_scaled[local_idx].reshape(-1, 1)).flatten()
+        i_vals = scaler_I.inverse_transform(test_I_scaled[local_idx].reshape(-1, 1)).flatten()
         
         predictions = {"Baseline": lin_reg.predict(i_vals.reshape(-1, 1)).flatten()}
         for m_name in model_classes.keys():
             predictions[m_name] = scaler_U.inverse_transform(preds_scaled_all[m_name][local_idx]).flatten()
             
-        eid = episode_ids[global_i]
-        ep_len = lengths[global_i]
+        eid = test_ids[local_idx]
+        ep_len = test_lengths[local_idx]
 
         plot_overview(u_true, predictions, label, args.output_dir)
         plot_high_precision_comparison(
